@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maison Dorée — Artisan Bakery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    /* ============================================================
+       CSS VARIABLES & RESET
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0a0906;
+      --card:        #131210;
+      --card-border: rgba(212,163,115,0.12);
+      --gold:        #d4a373;
+      --gold-light:  #e8c99a;
+      --gold-dim:    rgba(212,163,115,0.18);
+      --cream:       #f5ebe0;
+      --brown:       #6f4e37;
+      --text-dim:    rgba(245,235,224,0.55);
+      --blur-glass:  rgba(20,17,13,0.72);
+      --transition:  cubic-bezier(0.16,1,0.3,1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* ============================================================
+       CUSTOM CURSOR
+    ============================================================ */
+    #cursor-dot {
+      position: fixed; z-index: 9999; pointer-events: none;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--gold); top: 0; left: 0;
+      transform: translate(-50%,-50%);
+      transition: transform 0.08s ease, opacity 0.3s;
+    }
+    #cursor-ring {
+      position: fixed; z-index: 9998; pointer-events: none;
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 1px solid rgba(212,163,115,0.45);
+      top: 0; left: 0;
+      transform: translate(-50%,-50%);
+      transition: transform 0.22s var(--transition), width 0.3s, height 0.3s, border-color 0.3s, opacity 0.3s;
+    }
+    body.hovering #cursor-ring { width: 56px; height: 56px; border-color: var(--gold); }
+    body.hovering #cursor-dot  { transform: translate(-50%,-50%) scale(1.6); }
+
+    /* ============================================================
+       LOADING SCREEN
+    ============================================================ */
+    #loader {
+      position: fixed; inset: 0; z-index: 9000;
+      background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; }
+
+    .loader-oven {
+      width: 72px; height: 72px; position: relative; margin-bottom: 32px;
+    }
+    .oven-body {
+      width: 72px; height: 60px; border-radius: 8px;
+      border: 2px solid var(--gold); position: absolute; bottom: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .oven-glass {
+      width: 40px; height: 32px; border-radius: 4px;
+      border: 1.5px solid rgba(212,163,115,0.5);
+      background: radial-gradient(ellipse at 40% 40%, rgba(212,163,115,0.15), transparent);
+      animation: ovenGlow 1.4s ease-in-out infinite alternate;
+    }
+    @keyframes ovenGlow {
+      from { box-shadow: 0 0 8px rgba(212,163,115,0.2) inset; }
+      to   { box-shadow: 0 0 24px rgba(212,163,115,0.6) inset, 0 0 16px rgba(212,163,115,0.3); }
+    }
+    .oven-legs {
+      display: flex; justify-content: space-between;
+      padding: 0 10px; position: absolute; bottom: -10px; width: 100%;
+    }
+    .oven-leg { width: 6px; height: 10px; background: var(--gold); border-radius: 0 0 3px 3px; }
+    .steam { position: absolute; top: -12px; }
+    .steam span {
+      display: inline-block; width: 3px; height: 18px;
+      border-radius: 2px;
+      background: linear-gradient(to top, rgba(212,163,115,0.6), transparent);
+      margin: 0 3px;
+      animation: steamRise 1.6s ease-in-out infinite;
+    }
+    .steam span:nth-child(2) { animation-delay: 0.3s; height: 24px; }
+    .steam span:nth-child(3) { animation-delay: 0.6s; }
+    @keyframes steamRise {
+      0%   { transform: translateY(0) scaleX(1); opacity: 0.8; }
+      100% { transform: translateY(-18px) scaleX(0.3); opacity: 0; }
+    }
+    .loader-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1rem; letter-spacing: 0.35em;
+      color: var(--gold); text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .loader-bar {
+      width: 180px; height: 1px; background: rgba(212,163,115,0.15);
+      position: relative; overflow: hidden; border-radius: 2px;
+    }
+    .loader-fill {
+      position: absolute; left: -100%; top: 0; height: 100%;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      animation: loaderSweep 1.6s ease-in-out infinite;
+    }
+    @keyframes loaderSweep { to { left: 100%; } }
+
+    /* ============================================================
+       NAVBAR
+    ============================================================ */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 800;
+      padding: 20px 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: transparent;
+      transition: background 0.5s ease, padding 0.5s ease, backdrop-filter 0.5s ease;
+    }
+    nav.scrolled {
+      background: var(--blur-glass);
+      backdrop-filter: blur(20px) saturate(1.4);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      padding: 14px 48px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .nav-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; font-weight: 300; letter-spacing: 0.1em;
+      color: var(--cream); text-decoration: none;
+    }
+    .nav-logo span { color: var(--gold); }
+    .nav-links { display: flex; gap: 36px; list-style: none; }
+    .nav-links a {
+      color: var(--text-dim); text-decoration: none;
+      font-size: 0.8rem; letter-spacing: 0.15em; text-transform: uppercase;
+      position: relative; transition: color 0.3s;
+    }
+    .nav-links a::after {
+      content: ''; position: absolute; bottom: -4px; left: 0;
+      width: 0; height: 1px; background: var(--gold);
+      transition: width 0.4s var(--transition);
+    }
+    .nav-links a:hover { color: var(--gold); }
+    .nav-links a:hover::after { width: 100%; }
+    .nav-hamburger { display: none; flex-direction: column; gap: 5px; cursor: none; }
+    .nav-hamburger span { width: 24px; height: 1px; background: var(--cream); transition: all 0.3s; }
+
+    /* ============================================================
+       HERO
+    ============================================================ */
+    #hero {
+      position: relative; height: 100vh; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #hero-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      display: block;
+    }
+    .hero-overlay {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 60%, transparent 30%, #0a0906 90%);
+    }
+    .hero-content {
+      position: relative; z-index: 2;
+      text-align: center; padding: 0 24px;
+      opacity: 0; transform: translateY(30px);
+      animation: heroIn 1.2s 0.4s var(--transition) forwards;
+    }
+    @keyframes heroIn {
+      to { opacity: 1; transform: none; }
+    }
+    .hero-eyebrow {
+      font-size: 0.7rem; letter-spacing: 0.45em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .hero-eyebrow::before, .hero-eyebrow::after {
+      content: ''; width: 40px; height: 1px; background: var(--gold); opacity: 0.5;
+    }
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(3rem, 7vw, 6.5rem); font-weight: 300;
+      line-height: 1.05; letter-spacing: -0.01em;
+      color: var(--cream); margin-bottom: 20px;
+    }
+    .hero-title em { color: var(--gold); font-style: italic; }
+    .hero-sub {
+      font-size: clamp(0.85rem, 1.5vw, 1rem); color: var(--text-dim);
+      letter-spacing: 0.06em; margin-bottom: 48px; max-width: 420px; margin-inline: auto;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 36px; border-radius: 2px;
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold); font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem; letter-spacing: 0.2em; text-transform: uppercase;
+      text-decoration: none; cursor: none;
+      transition: background 0.4s, color 0.4s, box-shadow 0.4s;
+      position: relative; overflow: hidden;
+    }
+    .btn-primary::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--gold); transform: scaleX(0); transform-origin: left;
+      transition: transform 0.45s var(--transition); z-index: -1;
+    }
+    .btn-primary:hover { color: var(--bg); box-shadow: 0 0 32px rgba(212,163,115,0.3); }
+    .btn-primary:hover::before { transform: scaleX(1); }
+    .scroll-hint {
+      position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
+      z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px;
+      color: var(--text-dim); font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase;
+      animation: float 2.4s ease-in-out infinite;
+    }
+    .scroll-hint svg { width: 16px; opacity: 0.4; }
+    @keyframes float {
+      0%,100% { transform: translateX(-50%) translateY(0); }
+      50%      { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* ============================================================
+       PARTICLES CANVAS (flour dust)
+    ============================================================ */
+    #particles-canvas {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    }
+
+    /* ============================================================
+       SECTION SHARED
+    ============================================================ */
+    section { position: relative; z-index: 2; }
+    .section-label {
+      font-size: 0.65rem; letter-spacing: 0.45em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 12px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-label::before {
+      content: ''; width: 28px; height: 1px; background: var(--gold);
+    }
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.2rem, 4.5vw, 3.8rem); font-weight: 300;
+      line-height: 1.1; color: var(--cream);
+    }
+    .section-title em { color: var(--gold); font-style: italic; }
+
+    /* ============================================================
+       PRODUCTS SECTION
+    ============================================================ */
+    #products {
+      padding: 140px 48px 120px;
+      max-width: 1400px; margin: 0 auto;
+    }
+    .products-header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      margin-bottom: 80px; flex-wrap: wrap; gap: 24px;
+    }
+    .products-header p {
+      max-width: 320px; color: var(--text-dim);
+      font-size: 0.9rem; line-height: 1.7; letter-spacing: 0.02em;
+    }
+
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    /* Product Card */
+    .product-card {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: none;
+      transform: translateY(40px); opacity: 0;
+      transition: transform 0.7s var(--transition), opacity 0.7s var(--transition);
+    }
+    .product-card.visible { transform: translateY(0); opacity: 1; }
+    .product-card:nth-child(1) { transition-delay: 0.05s; }
+    .product-card:nth-child(2) { transition-delay: 0.12s; }
+    .product-card:nth-child(3) { transition-delay: 0.19s; }
+    .product-card:nth-child(4) { transition-delay: 0.26s; }
+    .product-card:nth-child(5) { transition-delay: 0.33s; }
+    .product-card:nth-child(6) { transition-delay: 0.40s; }
+
+    .card-visual {
+      position: relative; height: 240px; overflow: hidden;
+      background: #0e0c0a;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+    }
+    .card-badge {
+      position: absolute; top: 16px; right: 16px;
+      background: var(--gold-dim);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(212,163,115,0.25);
+      color: var(--gold); font-size: 0.6rem;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 2px;
+    }
+    .card-glow {
+      position: absolute; inset: 0; opacity: 0;
+      background: radial-gradient(ellipse at 50% 80%, rgba(212,163,115,0.12), transparent 70%);
+      transition: opacity 0.5s;
+    }
+    .product-card:hover .card-glow { opacity: 1; }
+
+    .card-body {
+      padding: 24px 28px 28px;
+      border-top: 1px solid var(--card-border);
+    }
+    .card-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.45rem; font-weight: 400;
+      color: var(--cream); margin-bottom: 8px;
+      transition: color 0.3s;
+    }
+    .product-card:hover .card-name { color: var(--gold-light); }
+    .card-desc {
+      font-size: 0.78rem; color: var(--text-dim);
+      line-height: 1.65; letter-spacing: 0.02em; margin-bottom: 20px;
+    }
+    .card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-price {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.3rem; color: var(--gold);
+    }
+    .card-cta {
+      font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--text-dim); display: flex; align-items: center; gap: 6px;
+      transition: color 0.3s, gap 0.3s;
+    }
+    .card-cta svg { width: 14px; }
+    .product-card:hover .card-cta { color: var(--gold); gap: 10px; }
+
+    /* Hover tilt effect via JS */
+    .product-card { will-change: transform; }
+
+    /* ============================================================
+       ABOUT STRIP
+    ============================================================ */
+    #about {
+      padding: 100px 48px;
+      background: linear-gradient(180deg, #0a0906, #0e0b08, #0a0906);
+    }
+    .about-inner {
+      max-width: 1400px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+    }
+    #about-canvas {
+      width: 100%; aspect-ratio: 1 / 1;
+      border-radius: 4px; display: block;
+    }
+    .about-text .section-label { margin-bottom: 16px; }
+    .about-text .section-title { margin-bottom: 24px; }
+    .about-text p {
+      color: var(--text-dim); font-size: 0.9rem;
+      line-height: 1.8; letter-spacing: 0.02em; margin-bottom: 16px;
+    }
+    .stats-row {
+      display: flex; gap: 40px; margin-top: 40px;
+    }
+    .stat h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.4rem; color: var(--gold); font-weight: 300;
+    }
+    .stat p { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); }
+
+    /* ============================================================
+       CONTACT
+    ============================================================ */
+    #contact {
+      padding: 120px 48px;
+      text-align: center;
+    }
+    .contact-inner { max-width: 640px; margin: 0 auto; }
+    #contact .section-label { justify-content: center; }
+    #contact .section-label::before { display: none; }
+    #contact .section-title { margin-bottom: 24px; }
+    #contact p { color: var(--text-dim); margin-bottom: 48px; font-size: 0.9rem; line-height: 1.7; }
+    .contact-email {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem; color: var(--gold);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(212,163,115,0.3);
+      padding-bottom: 4px;
+      transition: border-color 0.3s;
+    }
+    .contact-email:hover { border-color: var(--gold); }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    footer {
+      padding: 36px 48px;
+      border-top: 1px solid var(--card-border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+    }
+    footer .nav-logo { font-size: 1.1rem; }
+    footer p { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--text-dim); }
+
+    /* ============================================================
+       MODAL
+    ============================================================ */
+    #modal-overlay {
+      position: fixed; inset: 0; z-index: 850;
+      background: rgba(10,9,6,0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      opacity: 0; visibility: hidden;
+      transition: opacity 0.45s ease, visibility 0.45s;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    #modal-overlay.open { opacity: 1; visibility: visible; }
+
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      max-width: 720px; width: 100%;
+      display: grid; grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+      transform: scale(0.9) translateY(20px);
+      transition: transform 0.5s var(--transition);
+    }
+    #modal-overlay.open .modal { transform: scale(1) translateY(0); }
+
+    #modal-canvas-wrap {
+      height: 420px; position: relative; background: #0e0c0a;
+    }
+    #modal-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+    .modal-body {
+      padding: 48px 36px; display: flex;
+      flex-direction: column; justify-content: center;
+    }
+    .modal-label {
+      font-size: 0.6rem; letter-spacing: 0.35em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 12px;
+    }
+    .modal-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem; font-weight: 400; color: var(--cream);
+      margin-bottom: 16px; line-height: 1.15;
+    }
+    .modal-desc {
+      font-size: 0.82rem; color: var(--text-dim);
+      line-height: 1.75; margin-bottom: 28px;
+    }
+    .modal-price {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem; color: var(--gold);
+      margin-bottom: 28px;
+    }
+    .modal-price small { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--text-dim); }
+    .btn-cart {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 28px; background: var(--gold);
+      color: var(--bg); border: none; border-radius: 2px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase;
+      cursor: none; width: fit-content;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .btn-cart:hover { background: var(--gold-light); box-shadow: 0 6px 24px rgba(212,163,115,0.3); }
+    .modal-close {
+      position: absolute; top: 20px; right: 20px;
+      background: rgba(20,17,13,0.8); backdrop-filter: blur(8px);
+      border: 1px solid var(--card-border);
+      color: var(--text-dim); border-radius: 50%;
+      width: 36px; height: 36px; cursor: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; transition: color 0.3s, border-color 0.3s;
+      z-index: 2;
+    }
+    .modal-close:hover { color: var(--gold); border-color: var(--gold); }
+
+    /* ============================================================
+       CART TOAST
+    ============================================================ */
+    .cart-toast {
+      position: fixed; bottom: 36px; right: 36px; z-index: 900;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      border-radius: 4px;
+      padding: 14px 22px;
+      display: flex; align-items: center; gap: 12px;
+      font-size: 0.8rem; color: var(--cream);
+      transform: translateY(80px); opacity: 0;
+      transition: transform 0.5s var(--transition), opacity 0.5s;
+    }
+    .cart-toast.show { transform: translateY(0); opacity: 1; }
+    .cart-toast svg { color: var(--gold); }
+
+    /* ============================================================
+       SCROLL REVEAL
+    ============================================================ */
+    .reveal {
+      opacity: 0; transform: translateY(32px);
+      transition: opacity 0.8s var(--transition), transform 0.8s var(--transition);
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-width: 1024px) {
+      .products-grid { grid-template-columns: repeat(2, 1fr); }
+      .about-inner { grid-template-columns: 1fr; }
+      #about-canvas { max-width: 400px; margin: 0 auto; }
+      .modal { grid-template-columns: 1fr; }
+      #modal-canvas-wrap { height: 260px; }
+    }
+    @media (max-width: 700px) {
+      nav { padding: 16px 24px; }
+      nav.scrolled { padding: 12px 24px; }
+      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
+      .nav-links.open {
+        display: flex; flex-direction: column;
+        position: absolute; top: 100%; left: 0; right: 0;
+        background: var(--blur-glass);
+        backdrop-filter: blur(20px);
+        padding: 24px; gap: 20px;
+        border-bottom: 1px solid var(--card-border);
+      }
+      .products-grid { grid-template-columns: 1fr; }
+      #products, #about, #contact { padding: 80px 24px; }
+      footer { padding: 24px; flex-direction: column; }
+      .hero-title { font-size: clamp(2.4rem, 9vw, 4rem); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CURSOR -->
+  <div id="cursor-dot"></div>
+  <div id="cursor-ring"></div>
+
+  <!-- LOADER -->
+  <div id="loader">
+    <div class="loader-oven">
+      <div class="steam">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="oven-body">
+        <div class="oven-glass"></div>
+      </div>
+      <div class="oven-legs">
+        <div class="oven-leg"></div>
+        <div class="oven-leg"></div>
+      </div>
+    </div>
+    <p class="loader-text">Baking your experience</p>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+  </div>
+
+  <!-- PARTICLES -->
+  <canvas id="particles-canvas"></canvas>
+
+  <!-- NAVBAR -->
+  <nav id="navbar">
+    <a href="#" class="nav-logo">Maison <span>Dorée</span></a>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="#hero">Home</a></li>
+      <li><a href="#products">Products</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <div class="nav-hamburger" id="hamburger" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section id="hero">
+    <canvas id="hero-canvas"></canvas>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <p class="hero-eyebrow">Est. 2019 · Handcrafted</p>
+      <h1 class="hero-title">Artisan Bakery<br><em>Experience</em></h1>
+      <p class="hero-sub">Freshly baked happiness in a 3D world — crafted with love, served with elegance</p>
+      <a href="#products" class="btn-primary">
+        Explore Products
+        <svg width="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+    <div class="scroll-hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      Scroll
+    </div>
+  </section>
+
+  <!-- PRODUCTS -->
+  <section id="products">
+    <div class="products-header reveal">
+      <div>
+        <p class="section-label">Our Collection</p>
+        <h2 class="section-title">Crafted with<br><em>Passion</em></h2>
+      </div>
+      <p>Each cookie is a small masterpiece — baked fresh daily using heirloom recipes, premium ingredients, and generations of expertise.</p>
+    </div>
+    <div class="products-grid" id="products-grid">
+      <!-- Cards injected by JS -->
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about">
+    <div class="about-inner">
+      <canvas id="about-canvas"></canvas>
+      <div class="about-text reveal">
+        <p class="section-label">Our Story</p>
+        <h2 class="section-title">Baked with<br><em>Heritage</em></h2>
+        <p>Born from a family kitchen in 2019, Maison Dorée set out to redefine what a modern artisan bakery could be. We blend old-world techniques with contemporary flavours.</p>
+        <p>Every ingredient is sourced ethically. Every recipe is tested obsessively. Every bite tells a story of warmth, craft, and dedication.</p>
+        <div class="stats-row">
+          <div class="stat"><h3>6+</h3><p>Signature Cookies</p></div>
+          <div class="stat"><h3>12k</h3><p>Happy Customers</p></div>
+          <div class="stat"><h3>5★</h3><p>Avg Rating</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section id="contact">
+    <div class="contact-inner reveal">
+      <p class="section-label">Get In Touch</p>
+      <h2 class="section-title">Let's Talk<br><em>Cookies</em></h2>
+      <p>Whether you're placing a bulk order, exploring partnerships, or simply want to chat about baking — we'd love to hear from you.</p>
+      <a href="mailto:hello@maisondoree.com" class="contact-email">hello@maisondoree.com</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <a href="#" class="nav-logo">Maison <span>Dorée</span></a>
+    <p>© 2026 Maison Dorée. All rights reserved.</p>
+    <p>Crafted with ♥ &amp; flour</p>
+  </footer>
+
+  <!-- MODAL -->
+  <div id="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div id="modal-canvas-wrap" style="position:relative;">
+        <canvas id="modal-canvas"></canvas>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-label">Maison Dorée Collection</p>
+        <h2 class="modal-name" id="m-name"></h2>
+        <p class="modal-desc" id="m-desc"></p>
+        <p class="modal-price"><span id="m-price"></span> <small>/ 200g box</small></p>
+        <button class="btn-cart" onclick="addToCart()">
+          <svg width="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2 3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+          Add to Cart
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CART TOAST -->
+  <div class="cart-toast" id="cart-toast">
+    <svg width="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    Added to your cart!
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT
+  ============================================================ -->
+  <script>
+  /* ---- DATA ---- */
+  const products = [
+    {
+      id: 'almond-stick',
+      name: 'Almond Stick',
+      tagline: 'Crisp golden batons',
+      desc: 'Long, slender, and irresistibly crunchy — our almond sticks are slow-baked to a golden crisp, packed with whole blanched almonds and a whisper of vanilla.',
+      price: '₹320',
+      badge: 'Bestseller',
+      hue: [0.08, 0.65, 0.35],   // HSL for 3D accent
+    },
+    {
+      id: 'raisins-oats',
+      name: 'Raisins & Oats',
+      tagline: 'Wholesome & chewy',
+      desc: 'Rolled oats, plump sun-dried raisins, and a touch of cinnamon come together in this soft, hearty cookie that feels like a warm hug.',
+      price: '₹280',
+      badge: 'New',
+      hue: [0.06, 0.55, 0.4],
+    },
+    {
+      id: 'walnut',
+      name: 'Walnut Cookies',
+      tagline: 'Rich & nutty depth',
+      desc: 'Premium California walnuts folded into a buttery, brown-sugar dough. Each bite delivers a satisfying crunch wrapped in caramel warmth.',
+      price: '₹340',
+      badge: 'Premium',
+      hue: [0.05, 0.50, 0.30],
+    },
+    {
+      id: 'muesli',
+      name: 'Muesli Cookies',
+      tagline: 'Breakfast in a bite',
+      desc: 'Swiss-inspired muesli — oats, seeds, dried berries, and nuts — pressed into a rustic cookie that is equal parts nourishing and indulgent.',
+      price: '₹290',
+      badge: 'Healthy',
+      hue: [0.07, 0.60, 0.38],
+    },
+    {
+      id: 'choco-chips',
+      name: 'Choco Chips',
+      tagline: 'Dark chocolate bliss',
+      desc: 'Generous chunks of 70% dark chocolate nestled in a soft, golden-brown cookie that stays crisp at the edges and chewy at the centre.',
+      price: '₹360',
+      badge: 'Fan Fav',
+      hue: [0.04, 0.45, 0.22],
+    },
+    {
+      id: 'shrewsbury',
+      name: 'Shrewsbury Cookies',
+      tagline: 'Classic British elegance',
+      desc: 'A colonial-era classic — delicate, buttery shortbread rounds kissed with lemon zest and pressed with a traditional floral stamp.',
+      price: '₹260',
+      badge: 'Classic',
+      hue: [0.09, 0.70, 0.42],
+    },
+  ];
+
+  /* ---- UTILS ---- */
+  const $ = id => document.getElementById(id);
+
+  /* ---- LOADER ---- */
+  window.addEventListener('load', () => {
+    setTimeout(() => { $('loader').classList.add('hidden'); }, 2200);
+  });
+
+  /* ---- CURSOR ---- */
+  const dot  = $('cursor-dot');
+  const ring = $('cursor-ring');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+  (function cursorLoop() {
+    dot.style.left  = mx + 'px';
+    dot.style.top   = my + 'px';
+    rx += (mx - rx) * 0.14;
+    ry += (my - ry) * 0.14;
+    ring.style.left = rx + 'px';
+    ring.style.top  = ry + 'px';
+    requestAnimationFrame(cursorLoop);
+  })();
+  document.querySelectorAll('a,button,.product-card').forEach(el => {
+    el.addEventListener('mouseenter', () => document.body.classList.add('hovering'));
+    el.addEventListener('mouseleave', () => document.body.classList.remove('hovering'));
+  });
+
+  /* ---- NAVBAR ---- */
+  const navbar = $('navbar');
+  window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', window.scrollY > 60);
+  });
+  function toggleMenu() {
+    $('nav-links').classList.toggle('open');
+  }
+
+  /* ---- PARTICLES (flour dust) ---- */
+  (function initParticles() {
+    const canvas = $('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let W, H, particles = [];
+    function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+    for (let i = 0; i < 55; i++) {
+      particles.push({
+        x: Math.random() * W, y: Math.random() * H,
+        r: Math.random() * 1.8 + 0.4,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: -Math.random() * 0.3 - 0.05,
+        alpha: Math.random() * 0.25 + 0.05,
+      });
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      for (const p of particles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(245,235,224,${p.alpha})`;
+        ctx.fill();
+        p.x += p.vx; p.y += p.vy;
+        if (p.y < -4)  p.y = H + 4;
+        if (p.x < -4)  p.x = W + 4;
+        if (p.x > W+4) p.x = -4;
+      }
+      requestAnimationFrame(draw);
+    }
+    draw();
+  })();
+
+  /* ---- HERO 3D (Three.js) ---- */
+  (function initHero() {
+    const canvas = $('hero-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 6);
+
+    function resize() {
+      renderer.setSize(innerWidth, innerHeight);
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    /* Lighting */
+    scene.add(new THREE.AmbientLight(0xfff0d0, 0.4));
+    const point1 = new THREE.PointLight(0xd4a373, 3, 20);
+    point1.position.set(4, 4, 4);
+    scene.add(point1);
+    const point2 = new THREE.PointLight(0x6f4e37, 1.5, 15);
+    point2.position.set(-4, -2, 2);
+    scene.add(point2);
+
+    /* Cookie / hero geometry — stylised torus + sphere cluster */
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xd4a373, roughness: 0.55, metalness: 0.05,
+    });
+
+    // Big cookie disc
+    const disc = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.8, 1.9, 0.25, 64),
+      new THREE.MeshStandardMaterial({ color: 0xc4844a, roughness: 0.7, metalness: 0.02 })
+    );
+    disc.rotation.x = 0.3;
+    group.add(disc);
+
+    // Choco chips on cookie
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const r = 0.5 + Math.random() * 1.0;
+      const chip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.09 + Math.random() * 0.05, 8, 8),
+        new THREE.MeshStandardMaterial({ color: 0x3b2010, roughness: 0.4 })
+      );
+      chip.position.set(Math.cos(a) * r, 0.15, Math.sin(a) * r);
+      group.add(chip);
+    }
+
+    // Floating smaller cookies
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      const mini = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55, 0.6, 0.12, 32),
+        new THREE.MeshStandardMaterial({ color: 0xb87040, roughness: 0.75 })
+      );
+      mini.position.set(Math.cos(a) * 3.2, Math.sin(a) * 0.6 + 0.2, Math.sin(a) * 0.8);
+      mini.rotation.x = Math.random() * 0.8 - 0.4;
+      mini.rotation.z = Math.random() * 0.8 - 0.4;
+      group.add(mini);
+    }
+
+    scene.add(group);
+
+    /* Parallax on mouse */
+    let tx = 0, ty = 0, mxN = 0, myN = 0;
+    document.addEventListener('mousemove', e => {
+      mxN = (e.clientX / innerWidth  - 0.5) * 2;
+      myN = (e.clientY / innerHeight - 0.5) * 2;
+    });
+
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.008;
+      tx += (mxN * 0.35 - tx) * 0.04;
+      ty += (myN * 0.2  - ty) * 0.04;
+      group.rotation.y = t + tx;
+      group.rotation.x = 0.15 + ty * 0.3;
+      group.position.y = Math.sin(t * 0.8) * 0.12;
+      point1.position.x = 4 + Math.sin(t) * 2;
+      renderer.render(scene, camera);
+    }
+    animate();
+  })();
+
+  /* ---- PRODUCT CARDS ---- */
+  (function renderCards() {
+    const grid = $('products-grid');
+    products.forEach(p => {
+      const card = document.createElement('article');
+      card.className = 'product-card';
+      card.innerHTML = `
+        <div class="card-visual">
+          <canvas class="card-canvas" data-id="${p.id}"></canvas>
+          <div class="card-glow"></div>
+          <span class="card-badge">${p.badge}</span>
+        </div>
+        <div class="card-body">
+          <h3 class="card-name">${p.name}</h3>
+          <p class="card-desc">${p.tagline} — ${p.desc.slice(0, 70)}…</p>
+          <div class="card-footer">
+            <span class="card-price">${p.price}</span>
+            <span class="card-cta">
+              View Details
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </div>
+        </div>`;
+      card.addEventListener('click', () => openModal(p));
+      // Tilt
+      card.addEventListener('mousemove', e => {
+        const r  = card.getBoundingClientRect();
+        const nx = ((e.clientX - r.left) / r.width  - 0.5) * 2;
+        const ny = ((e.clientY - r.top)  / r.height - 0.5) * 2;
+        card.style.transform = `perspective(900px) rotateY(${nx * 6}deg) rotateX(${-ny * 4}deg) scale(1.02)`;
+      });
+      card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+      grid.appendChild(card);
+    });
+
+    /* Init mini 3D per card */
+    document.querySelectorAll('.card-canvas').forEach(canvas => {
+      const id = canvas.dataset.id;
+      const p  = products.find(x => x.id === id);
+      initCardScene(canvas, p);
+    });
+  })();
+
+  function initCardScene(canvas, product) {
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    const scene  = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, canvas.offsetWidth / canvas.offsetHeight, 0.1, 50);
+    camera.position.set(0, 0.5, 3.2);
+
+    function resize() {
+      const w = canvas.offsetWidth, h = canvas.offsetHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+
+    scene.add(new THREE.AmbientLight(0xfff0d0, 0.5));
+    const pl = new THREE.PointLight(0xd4a373, 3, 12);
+    pl.position.set(3, 3, 3);
+    scene.add(pl);
+
+    /* Cookie shape */
+    const [h, s, l] = product.hue;
+    const cookieColor = new THREE.Color().setHSL(h, s, l);
+    const cookie = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.9, 0.95, 0.18, 48),
+      new THREE.MeshStandardMaterial({ color: cookieColor, roughness: 0.7 })
+    );
+    scene.add(cookie);
+
+    /* Topping dots */
+    const toppingColor = new THREE.Color().setHSL(h, 0.3, 0.15);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const r = 0.3 + Math.random() * 0.45;
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.06, 8, 8),
+        new THREE.MeshStandardMaterial({ color: toppingColor, roughness: 0.5 })
+      );
+      dot.position.set(Math.cos(a) * r, 0.12, Math.sin(a) * r);
+      scene.add(dot);
+    }
+
+    let t = Math.random() * 100;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.012;
+      cookie.rotation.y = t;
+      cookie.position.y = Math.sin(t * 0.7) * 0.08;
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', resize);
+  }
+
+  /* ---- MODAL 3D ---- */
+  let modalRenderer, modalScene, modalCamera, modalCookie;
+
+  (function initModalScene() {
+    const canvas = $('modal-canvas');
+    modalRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    modalRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    modalScene  = new THREE.Scene();
+    modalCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 50);
+    modalCamera.position.set(0, 0.8, 3.8);
+
+    modalScene.add(new THREE.AmbientLight(0xfff0d0, 0.5));
+    const pl = new THREE.PointLight(0xd4a373, 4, 14);
+    pl.position.set(3, 3, 3);
+    modalScene.add(pl);
+    const pl2 = new THREE.PointLight(0x6f4e37, 1.5, 10);
+    pl2.position.set(-3, -2, 1);
+    modalScene.add(pl2);
+
+    modalCookie = new THREE.Group();
+    modalScene.add(modalCookie);
+
+    function resizeModal() {
+      const wrap = $('modal-canvas-wrap');
+      const w = wrap.offsetWidth, h = wrap.offsetHeight;
+      modalRenderer.setSize(w, h);
+      modalCamera.aspect = w / h;
+      modalCamera.updateProjectionMatrix();
+    }
+    resizeModal();
+    window.addEventListener('resize', resizeModal);
+
+    let mt = 0, mmx = 0, mmy = 0;
+    $('modal-canvas-wrap').addEventListener('mousemove', e => {
+      const r = $('modal-canvas-wrap').getBoundingClientRect();
+      mmx = ((e.clientX - r.left) / r.width  - 0.5) * 2;
+      mmy = ((e.clientY - r.top)  / r.height - 0.5) * 2;
+    });
+
+    function animateModal() {
+      requestAnimationFrame(animateModal);
+      mt += 0.01;
+      if (modalCookie) {
+        modalCookie.rotation.y += (mmx * 0.6 + mt - modalCookie.rotation.y) * 0.05;
+        modalCookie.rotation.x += (-mmy * 0.3 + 0.1 - modalCookie.rotation.x) * 0.05;
+        modalCookie.position.y = Math.sin(mt * 0.8) * 0.08;
+      }
+      modalRenderer.render(modalScene, modalCamera);
+    }
+    animateModal();
+  })();
+
+  function buildModalCookie(product) {
+    while (modalCookie.children.length) modalCookie.remove(modalCookie.children[0]);
+    const [h, s, l] = product.hue;
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.06, 0.22, 64),
+      new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(h, s, l), roughness: 0.65, metalness: 0.04 })
+    );
+    modalCookie.add(base);
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const r = 0.25 + Math.random() * 0.65;
+      const chip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.07 + Math.random() * 0.04, 10, 10),
+        new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(h, 0.3, 0.15), roughness: 0.4 })
+      );
+      chip.position.set(Math.cos(a) * r, 0.14, Math.sin(a) * r);
+      modalCookie.add(chip);
+    }
+  }
+
+  /* ---- MODAL OPEN/CLOSE ---- */
+  function openModal(product) {
+    $('m-name').textContent  = product.name;
+    $('m-desc').textContent  = product.desc;
+    $('m-price').textContent = product.price;
+    buildModalCookie(product);
+    $('modal-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    $('modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  $('modal-overlay').addEventListener('click', e => {
+    if (e.target === $('modal-overlay')) closeModal();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  /* ---- CART TOAST ---- */
+  function addToCart() {
+    closeModal();
+    const toast = $('cart-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2800);
+  }
+
+  /* ---- ABOUT 3D ---- */
+  (function initAbout() {
+    const canvas = $('about-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const scene  = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 60);
+    camera.position.set(0, 0, 7);
+    scene.add(new THREE.AmbientLight(0xfff0d0, 0.35));
+    const pl = new THREE.PointLight(0xd4a373, 4, 18);
+    pl.position.set(4, 5, 4);
+    scene.add(pl);
+    const pl2 = new THREE.PointLight(0x6f4e37, 2, 12);
+    pl2.position.set(-3, -2, 1);
+    scene.add(pl2);
+
+    function resize() {
+      const w = canvas.offsetWidth;
+      renderer.setSize(w, w);
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    /* Stacked cookie tower */
+    const group = new THREE.Group();
+    const cols  = [0xc4844a, 0xb06030, 0xd4a060, 0xa85028, 0xc87848];
+    for (let i = 0; i < 5; i++) {
+      const disc = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.2 - i * 0.07, 1.24 - i * 0.07, 0.2, 52),
+        new THREE.MeshStandardMaterial({ color: cols[i], roughness: 0.68 })
+      );
+      disc.position.y = i * 0.26 - 0.5;
+      disc.rotation.y = i * 0.4;
+      group.add(disc);
+      for (let j = 0; j < 10; j++) {
+        const a = (j / 10) * Math.PI * 2;
+        const r = 0.4 + Math.random() * 0.55;
+        const chip = new THREE.Mesh(
+          new THREE.SphereGeometry(0.055, 8, 8),
+          new THREE.MeshStandardMaterial({ color: 0x2a1408, roughness: 0.5 })
+        );
+        chip.position.set(Math.cos(a) * r, disc.position.y + 0.13, Math.sin(a) * r);
+        group.add(chip);
+      }
+    }
+    scene.add(group);
+
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.006;
+      group.rotation.y = t;
+      group.position.y = Math.sin(t * 0.7) * 0.06;
+      renderer.render(scene, camera);
+    }
+    animate();
+  })();
+
+  /* ---- SCROLL REVEAL ---- */
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        // For product cards
+        if (e.target.classList.contains('product-card')) return;
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  /* Card reveal */
+  const cardObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); cardObserver.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.product-card').forEach(c => cardObserver.observe(c));
+
+  </script>
+</body>
+</html>
